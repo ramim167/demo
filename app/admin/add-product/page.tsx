@@ -5,6 +5,7 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { collection, doc, setDoc } from "firebase/firestore";
 
 import { useAuth } from "@/components/auth-provider";
+import { useCatalog } from "@/components/catalog-provider";
 import { auth, db } from "@/lib/firebaseConfig";
 import { cloudinaryConfig, uploadImageToCloudinary } from "@/lib/cloudinary";
 import { Product } from "@/lib/types";
@@ -29,6 +30,8 @@ function buildProductPayload({
   name,
   price,
   sport,
+  collectionTag,
+  collectionId,
   frontImageUrl,
   backImageUrl,
   uploaderUid
@@ -37,6 +40,8 @@ function buildProductPayload({
   name: string;
   price: number;
   sport: (typeof sportOptions)[number];
+  collectionTag: string;
+  collectionId: string;
   frontImageUrl: string;
   backImageUrl: string;
   uploaderUid: string;
@@ -65,10 +70,10 @@ function buildProductPayload({
     highlights: [
       "Uploaded from the author dashboard",
       "Front and back images managed from the web",
-      "Pricing can be edited live from the web"
+      `Assigned to the ${collectionTag} group`
     ],
-    tags: [name.toLowerCase(), sport.toLowerCase(), "new upload"],
-    collectionIds: [],
+    tags: [name.toLowerCase(), sport.toLowerCase(), collectionTag.toLowerCase()],
+    collectionIds: [collectionId],
     discountPercentage: 0,
     source: "author",
     imageUrl: frontImageUrl,
@@ -183,6 +188,7 @@ function ImageField({
 }
 
 export default function AddProductPage() {
+  const { collections } = useCatalog();
   const { hydrated, user, isAuthor } = useAuth();
   const frontInputRef = useRef<HTMLInputElement | null>(null);
   const backInputRef = useRef<HTMLInputElement | null>(null);
@@ -190,6 +196,7 @@ export default function AddProductPage() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [sport, setSport] = useState<(typeof sportOptions)[number]>("Football");
+  const [groupTag, setGroupTag] = useState("");
   const [frontImageFile, setFrontImageFile] = useState<File | null>(null);
   const [backImageFile, setBackImageFile] = useState<File | null>(null);
   const [frontPreviewUrl, setFrontPreviewUrl] = useState("");
@@ -230,6 +237,7 @@ export default function AddProductPage() {
     setName("");
     setPrice("");
     setSport("Football");
+    setGroupTag("");
     setFrontImageFile(null);
     setBackImageFile(null);
 
@@ -260,6 +268,7 @@ export default function AddProductPage() {
     }
 
     const trimmedName = name.trim();
+    const trimmedGroupTag = groupTag.trim();
     const numericPrice = Number(price);
     const firebaseUser = auth.currentUser;
 
@@ -273,6 +282,7 @@ export default function AddProductPage() {
 
     if (
       !trimmedName ||
+      !trimmedGroupTag ||
       !Number.isFinite(numericPrice) ||
       numericPrice <= 0 ||
       !frontImageFile ||
@@ -280,7 +290,21 @@ export default function AddProductPage() {
     ) {
       setStatus({
         tone: "error",
-        message: "Jersey name, valid price, front image, and back image are all required."
+        message: "Jersey name, valid price, valid group tag, front image, and back image are all required."
+      });
+      return;
+    }
+
+    const matchedCollection = collections.find(
+      (collection) =>
+        collection.name.toLowerCase() === trimmedGroupTag.toLowerCase() ||
+        collection.slug.toLowerCase() === trimmedGroupTag.toLowerCase()
+    );
+
+    if (!matchedCollection) {
+      setStatus({
+        tone: "error",
+        message: "Use a valid existing tag/block name before uploading this jersey."
       });
       return;
     }
@@ -303,6 +327,8 @@ export default function AddProductPage() {
         name: trimmedName,
         price: numericPrice,
         sport,
+        collectionTag: matchedCollection.name,
+        collectionId: matchedCollection.id,
         frontImageUrl,
         backImageUrl,
         uploaderUid: firebaseUser.uid
@@ -492,6 +518,28 @@ export default function AddProductPage() {
               </select>
             </label>
 
+            <label className="premium-input p-4">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
+                Group Tag
+              </span>
+              <input
+                className="mt-3 w-full border-none bg-transparent p-0 text-base text-ink outline-none"
+                list="collection-tags"
+                onChange={(event) => setGroupTag(event.target.value)}
+                placeholder="National Team"
+                value={groupTag}
+              />
+              <datalist id="collection-tags">
+                {collections.map((entry) => (
+                  <option key={entry.id} value={entry.name} />
+                ))}
+              </datalist>
+              <p className="mt-3 text-xs text-ink/50">
+                This must match an existing block name exactly. The jersey will be attached to that
+                group at upload time.
+              </p>
+            </label>
+
             <div className="grid gap-4 lg:grid-cols-2">
               <ImageField
                 id="front-image"
@@ -530,6 +578,7 @@ export default function AddProductPage() {
               </p>
               <div className="mt-4 grid gap-3 text-sm text-ink/70">
                 <p>`imageUrl` stores the front image and `backImageUrl` stores the back image.</p>
+                <p>`collectionIds` is filled from the valid group tag you entered above.</p>
                 <p>`media` contains only `Front View` and `Back View` items.</p>
                 <p>`uploaderUid` is attached from the current Firebase Auth user.</p>
                 <p>The form resets automatically after a successful upload.</p>

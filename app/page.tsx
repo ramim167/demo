@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 
+import { CollectionShowcase } from "@/components/collection-showcase";
 import { Hero } from "@/components/hero";
 import { ProductCard } from "@/components/product-card";
 import { useCatalog } from "@/components/catalog-provider";
 
 export default function HomePage() {
-  const { featuredCollections, featuredProducts, menuSections } = useCatalog();
+  const { featuredProducts, menuSections } = useCatalog();
 
   return (
     <div className="pb-10">
@@ -53,44 +54,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="shell mt-20">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="eyebrow">Curated Collections</p>
-            <h2 className="section-heading mt-4 text-5xl sm:text-6xl">
-              Author-managed collections now surface directly on the storefront
-            </h2>
-          </div>
-          <Link className="button-secondary" href="/author">
-            Open author dashboard
-          </Link>
-        </div>
-
-        <div className="mt-9 grid gap-5 lg:grid-cols-3">
-          {featuredCollections.map((collection) => (
-            <div className="panel overflow-hidden p-4" key={collection.id}>
-              <div className={`rounded-[28px] bg-gradient-to-br ${collection.accent} p-4`}>
-                <div className="overflow-hidden rounded-[24px] bg-white/72 p-3 backdrop-blur">
-                  <img
-                    alt={collection.name}
-                    className="h-60 w-full rounded-[20px] object-cover"
-                    src={collection.coverImage}
-                  />
-                </div>
-              </div>
-              <div className="px-2 pb-2 pt-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">
-                  Collection
-                </p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink">
-                  {collection.name}
-                </h3>
-                <p className="mt-3 text-sm leading-7 muted-copy">{collection.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <CollectionShowcase />
 
       <section className="shell mt-20">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -122,7 +86,7 @@ export default function HomePage() {
               {[
                 {
                   title: "Search",
-                  body: "AI-style autocomplete with product thumbnails, team keywords, and edition intent."
+                  body: "A compact search button keeps the header clean and searches jersey titles only."
                 },
                 {
                   title: "Customize",
@@ -152,8 +116,8 @@ export default function HomePage() {
               Login roles are ready for user and author flows
             </h3>
             <p className="mt-4 text-sm leading-7 muted-copy">
-              The UI now includes a role-based auth scaffold. You can keep using the local logic
-              for development and later connect Firebase by filling the blank endpoints file.
+              The UI now includes verified Firebase roles, pending author approvals, and live
+              Firestore-backed author controls.
             </p>
             <Link className="button-primary mt-6" href="/login">
               Review login flow

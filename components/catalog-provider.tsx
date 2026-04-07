@@ -41,6 +41,8 @@ interface CatalogContextValue {
   menuSections: MenuSection[];
   featuredProducts: Product[];
   getProductBySlug: (slug: string) => Product | undefined;
+  getCollectionBySlug: (slug: string) => Collection | undefined;
+  getProductsByCollectionId: (collectionId: string) => Product[];
   searchProducts: (query: string) => Product[];
   upsertProduct: (product: Product) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
@@ -544,6 +546,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       menuSections,
       featuredProducts,
       getProductBySlug: (slug) => products.find((product) => product.slug === slug),
+      getCollectionBySlug: (slug) => collections.find((collection) => collection.slug === slug),
+      getProductsByCollectionId: (collectionId) =>
+        products.filter((product) => product.collectionIds.includes(collectionId)),
       searchProducts: (query) => {
         const term = query.trim().toLowerCase();
 
@@ -551,17 +556,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return featuredProducts;
         }
 
-        return products.filter((product) => {
-          const fields = [
-            product.name,
-            product.team,
-            product.league,
-            product.sport,
-            ...product.tags
-          ];
-
-          return fields.some((field) => field.toLowerCase().includes(term));
-        });
+        return products.filter((product) => product.name.toLowerCase().includes(term));
       },
       upsertProduct,
       deleteProduct,
