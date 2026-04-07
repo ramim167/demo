@@ -68,10 +68,10 @@ function normalizeProduct(record: Record<string, unknown>, id: string): Product 
       : typeof record["image"] === "string"
         ? String(record["image"])
         : "/images/jerseys/club-sky-front.svg";
-  const videoPoster =
-    typeof record.videoPoster === "string"
-      ? record.videoPoster
-      : "/images/jerseys/video-preview.svg";
+  const backImageUrl =
+    typeof record.backImageUrl === "string"
+      ? record.backImageUrl
+      : imageUrl;
   const rawVariants = Array.isArray(record.variants) ? record.variants : null;
   const basePrice = toNumber(record.priceFrom ?? record.price, 0);
   const sport =
@@ -118,26 +118,33 @@ function normalizeProduct(record: Record<string, unknown>, id: string): Product 
     discountPercentage: toNumber(record.discountPercentage, 0),
     source: record.source === "author" ? "author" : "seed",
     imageUrl,
+    backImageUrl,
     uploaderUid: typeof record.uploaderUid === "string" ? record.uploaderUid : undefined,
     createdAt: typeof record.createdAt === "string" ? record.createdAt : undefined,
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : undefined,
     media: Array.isArray(record.media)
-      ? record.media.map((media, index) => {
-          const item = media as Record<string, unknown>;
+      ? (record.media as Record<string, unknown>[])
+          .filter((media) => media.type !== "video")
+          .slice(0, 2)
+          .map((media, index) => {
+            const item = media as Record<string, unknown>;
 
-          return {
-            id: String(item.id ?? `${id}-media-${index}`),
-            type: item.type === "video" ? "video" : "image",
-            src:
-              typeof item.src === "string"
-                ? item.src
-                : index === 2
-                  ? videoPoster
-                  : imageUrl,
-            alt: String(item.alt ?? `${record.name ?? "Jersey"} ${index + 1}`),
-            label: String(item.label ?? (index === 0 ? "Front View" : index === 1 ? "Back View" : "Video Preview"))
-          };
-        })
+            return {
+              id: String(item.id ?? `${id}-media-${index}`),
+              type: "image" as const,
+              src:
+                typeof item.src === "string"
+                  ? item.src
+                  : index === 0
+                    ? imageUrl
+                    : backImageUrl,
+              alt: String(
+                item.alt ??
+                  `${record.name ?? "Jersey"} ${index === 0 ? "front" : "back"} view`
+              ),
+              label: String(item.label ?? (index === 0 ? "Front View" : "Back View"))
+            };
+          })
       : [
           {
             id: `${id}-front`,
@@ -149,16 +156,9 @@ function normalizeProduct(record: Record<string, unknown>, id: string): Product 
           {
             id: `${id}-back`,
             type: "image",
-            src: imageUrl,
+            src: backImageUrl,
             alt: `${record.name ?? "Jersey"} back view`,
             label: "Back View"
-          },
-          {
-            id: `${id}-video`,
-            type: "video",
-            src: videoPoster,
-            alt: `${record.name ?? "Jersey"} video preview`,
-            label: "Video Preview"
           }
         ],
     variants: rawVariants?.length

@@ -6,12 +6,10 @@ import { collection, doc, setDoc } from "firebase/firestore";
 
 import { useAuth } from "@/components/auth-provider";
 import { auth, db } from "@/lib/firebaseConfig";
+import { cloudinaryConfig, uploadImageToCloudinary } from "@/lib/cloudinary";
 import { Product } from "@/lib/types";
 
 const sportOptions = ["Football", "Cricket"] as const;
-const cloudName = "dwcbgl4oc";
-const uploadPreset = "Jersey";
-const uploadEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 
 type StatusState =
   | { tone: "idle"; message: string }
@@ -31,14 +29,16 @@ function buildProductPayload({
   name,
   price,
   sport,
-  imageUrl,
+  frontImageUrl,
+  backImageUrl,
   uploaderUid
 }: {
   productId: string;
   name: string;
   price: number;
   sport: (typeof sportOptions)[number];
-  imageUrl: string;
+  frontImageUrl: string;
+  backImageUrl: string;
   uploaderUid: string;
 }): Product {
   const now = new Date().toISOString();
@@ -64,14 +64,15 @@ function buildProductPayload({
     description: `${name} uploaded from the admin product studio.`,
     highlights: [
       "Uploaded from the author dashboard",
-      "Cloudinary image attached",
+      "Front and back images managed from the web",
       "Pricing can be edited live from the web"
     ],
     tags: [name.toLowerCase(), sport.toLowerCase(), "new upload"],
     collectionIds: [],
     discountPercentage: 0,
     source: "author",
-    imageUrl,
+    imageUrl: frontImageUrl,
+    backImageUrl,
     uploaderUid,
     createdAt: now,
     updatedAt: now,
@@ -79,23 +80,16 @@ function buildProductPayload({
       {
         id: `${productId}-front`,
         type: "image",
-        src: imageUrl,
+        src: frontImageUrl,
         alt: `${name} front view`,
         label: "Front View"
       },
       {
         id: `${productId}-back`,
         type: "image",
-        src: imageUrl,
-        alt: `${name} alternate view`,
+        src: backImageUrl,
+        alt: `${name} back view`,
         label: "Back View"
-      },
-      {
-        id: `${productId}-video`,
-        type: "video",
-        src: "/images/jerseys/video-preview.svg",
-        alt: `${name} video preview`,
-        label: "Video Preview"
       }
     ],
     variants: [
@@ -150,77 +144,112 @@ function buildProductPayload({
   };
 }
 
-async function uploadImageToCloudinary(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", uploadPreset);
-
-  const response = await fetch(uploadEndpoint, {
-    method: "POST",
-    body: formData
-  });
-
-  if (!response.ok) {
-    throw new Error("Image upload failed. Check Cloudinary preset configuration.");
-  }
-
-  const payload = (await response.json()) as { secure_url?: string };
-
-  if (!payload.secure_url) {
-    throw new Error("Cloudinary did not return a secure image URL.");
-  }
-
-  return payload.secure_url;
+function ImageField({
+  id,
+  label,
+  inputRef,
+  previewUrl,
+  onChange
+}: {
+  id: string;
+  label: string;
+  inputRef: { current: HTMLInputElement | null };
+  previewUrl: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="rounded-[30px] border border-ink/8 bg-white/76 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">{label}</p>
+      <div className="mt-4 overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,_rgba(91,124,250,0.08),_rgba(255,255,255,0.82))]">
+        {previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img alt={label} className="h-[280px] w-full object-cover" src={previewUrl} />
+        ) : (
+          <div className="flex h-[280px] items-center justify-center px-6 text-center text-sm text-ink/45">
+            Select an image file to preview the {label.toLowerCase()}.
+          </div>
+        )}
+      </div>
+      <input
+        accept="image/*"
+        className="mt-4 block w-full cursor-pointer text-sm text-ink/70 file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:font-semibold file:text-white"
+        id={id}
+        onChange={onChange}
+        ref={inputRef}
+        type="file"
+      />
+    </div>
+  );
 }
 
 export default function AddProductPage() {
   const { hydrated, user, isAuthor } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const frontInputRef = useRef<HTMLInputElement | null>(null);
+  const backInputRef = useRef<HTMLInputElement | null>(null);
 
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [sport, setSport] = useState<(typeof sportOptions)[number]>("Football");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [frontImageFile, setFrontImageFile] = useState<File | null>(null);
+  const [backImageFile, setBackImageFile] = useState<File | null>(null);
+  const [frontPreviewUrl, setFrontPreviewUrl] = useState("");
+  const [backPreviewUrl, setBackPreviewUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<StatusState>({
     tone: "idle",
-    message: "Upload a jersey image, then the product will be written into Firestore."
+    message: "Upload front and back jersey images, then the product will be written to Firestore."
   });
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+      if (frontPreviewUrl) {
+        URL.revokeObjectURL(frontPreviewUrl);
+      }
+
+      if (backPreviewUrl) {
+        URL.revokeObjectURL(backPreviewUrl);
       }
     };
-  }, [previewUrl]);
+  }, [backPreviewUrl, frontPreviewUrl]);
+
+  function handleFilePreview(
+    file: File | null,
+    currentPreviewUrl: string,
+    setFile: (value: File | null) => void,
+    setPreviewUrl: (value: string) => void
+  ) {
+    if (currentPreviewUrl) {
+      URL.revokeObjectURL(currentPreviewUrl);
+    }
+
+    setFile(file);
+    setPreviewUrl(file ? URL.createObjectURL(file) : "");
+  }
 
   function resetForm() {
     setName("");
     setPrice("");
     setSport("Football");
-    setImageFile(null);
+    setFrontImageFile(null);
+    setBackImageFile(null);
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl("");
+    if (frontPreviewUrl) {
+      URL.revokeObjectURL(frontPreviewUrl);
+      setFrontPreviewUrl("");
     }
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+    if (backPreviewUrl) {
+      URL.revokeObjectURL(backPreviewUrl);
+      setBackPreviewUrl("");
     }
 
-    setImageFile(file);
-    setPreviewUrl(file ? URL.createObjectURL(file) : "");
+    if (frontInputRef.current) {
+      frontInputRef.current.value = "";
+    }
+
+    if (backInputRef.current) {
+      backInputRef.current.value = "";
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -237,15 +266,21 @@ export default function AddProductPage() {
     if (!firebaseUser || !user || firebaseUser.uid !== user.id || !isAuthor) {
       setStatus({
         tone: "error",
-        message: "Only an authenticated author account can upload products."
+        message: "Only an authenticated approved author account can upload products."
       });
       return;
     }
 
-    if (!trimmedName || !Number.isFinite(numericPrice) || numericPrice <= 0 || !imageFile) {
+    if (
+      !trimmedName ||
+      !Number.isFinite(numericPrice) ||
+      numericPrice <= 0 ||
+      !frontImageFile ||
+      !backImageFile
+    ) {
       setStatus({
         tone: "error",
-        message: "Jersey name, valid price, category, and image are all required."
+        message: "Jersey name, valid price, front image, and back image are all required."
       });
       return;
     }
@@ -253,27 +288,31 @@ export default function AddProductPage() {
     setLoading(true);
     setStatus({
       tone: "idle",
-      message: "Uploading image to Cloudinary and saving the product to Firestore..."
+      message: "Uploading front and back images to Cloudinary and saving the product..."
     });
 
     try {
-      const imageUrl = await uploadImageToCloudinary(imageFile);
+      const [frontImageUrl, backImageUrl] = await Promise.all([
+        uploadImageToCloudinary(frontImageFile),
+        uploadImageToCloudinary(backImageFile)
+      ]);
+
       const productRef = doc(collection(db, "products"));
       const payload = buildProductPayload({
         productId: productRef.id,
         name: trimmedName,
         price: numericPrice,
         sport,
-        imageUrl,
+        frontImageUrl,
+        backImageUrl,
         uploaderUid: firebaseUser.uid
       });
 
       await setDoc(productRef, payload);
-
       resetForm();
       setStatus({
         tone: "success",
-        message: "Product uploaded successfully. The new jersey is now in the products collection."
+        message: "Product uploaded successfully with separate front and back images."
       });
     } catch (error) {
       setStatus({
@@ -299,9 +338,6 @@ export default function AddProductPage() {
         <div className="panel p-8 text-center">
           <p className="eyebrow">Login Required</p>
           <h1 className="section-heading mt-4 text-5xl">Sign in before uploading products</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 muted-copy">
-            This page only submits when a Firebase-authenticated session exists.
-          </p>
           <div className="mt-6 flex justify-center">
             <Link className="button-primary" href="/login">
               Go to login
@@ -319,8 +355,7 @@ export default function AddProductPage() {
           <p className="eyebrow">Author Access Only</p>
           <h1 className="section-heading mt-4 text-5xl">Your account does not have upload permission</h1>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 muted-copy">
-            User accounts can browse and shop. Author accounts can upload jerseys, edit prices,
-            build collections, and manage discount logic.
+            Only approved author accounts can upload or edit jersey products.
           </p>
           <div className="mt-6 flex justify-center">
             <Link className="button-primary" href="/account">
@@ -341,8 +376,8 @@ export default function AddProductPage() {
             Publish a new jersey from the browser
           </h1>
           <p className="mt-4 text-sm leading-7 text-white/72">
-            This form uploads the image directly to Cloudinary with your unsigned preset, then
-            writes the product into Firestore so the storefront can read it live.
+            This form uploads separate front and back jersey images directly to Cloudinary and
+            stores the product in Firestore for the storefront to read live.
           </p>
 
           <div className="mt-8 grid gap-4">
@@ -359,25 +394,30 @@ export default function AddProductPage() {
 
             <div className="rounded-[28px] border border-white/10 bg-white/6 p-5 text-sm leading-7 text-white/70">
               <p className="font-semibold text-white">Developer flow</p>
-              <p>1. Firebase Auth verifies the current author session.</p>
-              <p>2. Cloudinary returns `secure_url` for the uploaded image.</p>
-              <p>3. Firestore stores the product in the `products` collection.</p>
-              <p>4. The storefront listens to Firestore and updates automatically.</p>
+              <p>1. Firebase Auth verifies the current approved author session.</p>
+              <p>2. Cloudinary returns `secure_url` for front and back uploads.</p>
+              <p>3. Firestore stores both image URLs in the `products` collection.</p>
+              <p>4. The storefront updates automatically through the live listener.</p>
             </div>
 
             <div className="rounded-[28px] border border-white/10 bg-white/6 p-5 text-sm text-white/70">
               Cloudinary:
-              <span className="ml-2 font-semibold text-white">{cloudName}</span>
+              <span className="ml-2 font-semibold text-white">{cloudinaryConfig.cloudName}</span>
               <br />
               Upload preset:
-              <span className="ml-2 font-semibold text-white">{uploadPreset}</span>
+              <span className="ml-2 font-semibold text-white">
+                {cloudinaryConfig.uploadPreset}
+              </span>
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Link className="button-primary" href="/author">
                 Open author dashboard
               </Link>
-              <Link className="button-secondary border-white/15 bg-transparent text-white hover:border-white/30 hover:text-white" href="/">
+              <Link
+                className="button-secondary border-white/15 bg-transparent text-white hover:border-white/30 hover:text-white"
+                href="/"
+              >
                 Back to storefront
               </Link>
             </div>
@@ -452,50 +492,47 @@ export default function AddProductPage() {
               </select>
             </label>
 
-            <label className="premium-input p-4">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
-                Jersey Image
-              </span>
-              <input
-                accept="image/*"
-                className="mt-3 block w-full cursor-pointer text-sm text-ink/70 file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:font-semibold file:text-white"
-                onChange={handleFileChange}
-                ref={fileInputRef}
-                type="file"
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ImageField
+                id="front-image"
+                inputRef={frontInputRef}
+                label="Front Image"
+                onChange={(event) =>
+                  handleFilePreview(
+                    event.target.files?.[0] ?? null,
+                    frontPreviewUrl,
+                    setFrontImageFile,
+                    setFrontPreviewUrl
+                  )
+                }
+                previewUrl={frontPreviewUrl}
               />
-            </label>
 
-            <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="rounded-[30px] border border-ink/8 bg-white/76 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
-                  Preview
-                </p>
-                <div className="mt-4 overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,_rgba(91,124,250,0.08),_rgba(255,255,255,0.82))]">
-                  {previewUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      alt="Selected jersey preview"
-                      className="h-[320px] w-full object-cover"
-                      src={previewUrl}
-                    />
-                  ) : (
-                    <div className="flex h-[320px] items-center justify-center px-6 text-center text-sm text-ink/45">
-                      Select an image file to preview the jersey before upload.
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ImageField
+                id="back-image"
+                inputRef={backInputRef}
+                label="Back Image"
+                onChange={(event) =>
+                  handleFilePreview(
+                    event.target.files?.[0] ?? null,
+                    backPreviewUrl,
+                    setBackImageFile,
+                    setBackPreviewUrl
+                  )
+                }
+                previewUrl={backPreviewUrl}
+              />
+            </div>
 
-              <div className="rounded-[30px] border border-ink/8 bg-white/76 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
-                  Saved Product Shape
-                </p>
-                <div className="mt-4 grid gap-3 text-sm text-ink/70">
-                  <p>`name`, `priceFrom`, `sport`, and `imageUrl` are saved directly.</p>
-                  <p>`variants`, `media`, and `customization` are generated for storefront compatibility.</p>
-                  <p>`uploaderUid` is attached from the current Firebase Auth user.</p>
-                  <p>The form resets automatically after a successful upload.</p>
-                </div>
+            <div className="rounded-[30px] border border-ink/8 bg-white/76 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
+                Saved Product Shape
+              </p>
+              <div className="mt-4 grid gap-3 text-sm text-ink/70">
+                <p>`imageUrl` stores the front image and `backImageUrl` stores the back image.</p>
+                <p>`media` contains only `Front View` and `Back View` items.</p>
+                <p>`uploaderUid` is attached from the current Firebase Auth user.</p>
+                <p>The form resets automatically after a successful upload.</p>
               </div>
             </div>
 

@@ -1,76 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { UserRole } from "@/lib/types";
 
-function isUnverifiedMessage(message: string) {
-  return message.toLowerCase().includes("not verified");
-}
-
-export default function LoginPage() {
-  const router = useRouter();
-  const { signIn, resendVerificationEmail } = useAuth();
+export default function RegisterPage() {
+  const { signUp } = useAuth();
 
   const [role, setRole] = useState<UserRole>("user");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [showResend, setShowResend] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setStatus("");
     setError("");
-    setShowResend(false);
 
     try {
-      await signIn({
+      await signUp({
+        name,
         email,
         password,
         role
       });
 
-      router.push("/");
-      router.refresh();
-    } catch (caughtError) {
-      const message =
-        caughtError instanceof Error ? caughtError.message : "Unable to sign in right now.";
-
-      if (isUnverifiedMessage(message)) {
-        setError("Your email is not verified and do not let him sign in . Please check your inbox.");
-        setShowResend(true);
-      } else {
-        setError(message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleResendVerification() {
-    setResending(true);
-    setStatus("");
-    setError("");
-
-    try {
-      await resendVerificationEmail({ email, password });
-      setStatus("A new verification email has been sent. Please check your inbox.");
+      setPassword("");
+      setStatus(
+        role === "author"
+          ? "A verification email has been sent to your inbox. Please verify before logging in. After verification, your author request will wait for the main author to approve it."
+          : "A verification email has been sent to your inbox. Please verify before logging in."
+      );
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Unable to resend the verification email."
+        caughtError instanceof Error ? caughtError.message : "Unable to create your account."
       );
     } finally {
-      setResending(false);
+      setLoading(false);
     }
   }
 
@@ -78,37 +50,37 @@ export default function LoginPage() {
     <div className="shell py-10">
       <div className="grid gap-6 xl:grid-cols-[0.84fr_1.16fr]">
         <div className="panel-dark p-6 sm:p-8">
-          <p className="eyebrow border-white/10 bg-white/10 text-white">Email Verification</p>
+          <p className="eyebrow border-white/10 bg-white/10 text-white">Registration</p>
           <h1 className="mt-4 font-display text-5xl leading-[0.92] text-white sm:text-6xl">
-            Verified sign-in for users and authors
+            Create a verified store account
           </h1>
           <p className="mt-4 text-sm leading-7 text-white/72">
-            Every account must verify its email before login. Author accounts also go through a
-            second approval step managed by the main author.
+            New accounts receive a Firebase verification email immediately after sign-up. Author
+            accounts then move into the approval flow handled by the main author.
           </p>
 
           <div className="mt-8 grid gap-4">
             <div className="rounded-[28px] border border-white/10 bg-white/6 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/54">
-                User Access
+                User Accounts
               </p>
               <p className="mt-3 text-sm leading-7 text-white/72">
-                Verified users can sign in and go straight to the storefront.
+                Verify the email, then sign in and start shopping.
               </p>
             </div>
 
             <div className="rounded-[28px] border border-white/10 bg-white/6 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/54">
-                Author Access
+                Author Accounts
               </p>
               <p className="mt-3 text-sm leading-7 text-white/72">
-                Verified author accounts stay pending until the main author approves them.
+                Verify first. After that, the main author reviews and approves sub-author access.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link className="button-primary" href="/register">
-                Create account
+              <Link className="button-primary" href="/login">
+                Go to login
               </Link>
               <Link
                 className="button-secondary border-white/15 bg-transparent text-white hover:border-white/30 hover:text-white"
@@ -123,21 +95,21 @@ export default function LoginPage() {
         <div className="panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="eyebrow">Login</p>
-              <h2 className="section-heading mt-4 text-5xl sm:text-6xl">Sign in to continue</h2>
+              <p className="eyebrow">Register</p>
+              <h2 className="section-heading mt-4 text-5xl sm:text-6xl">Create your account</h2>
             </div>
             <Link
               className="rounded-full border border-ink/10 bg-white/80 px-4 py-2 text-sm font-semibold text-ink/70 transition hover:border-accent hover:text-accent"
-              href="/register"
+              href="/login"
             >
-              Need an account?
+              Already registered?
             </Link>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
             {[
-              { id: "user", label: "User", note: "Shopping and order tracking" },
-              { id: "author", label: "Author", note: "Catalog and approval tools" }
+              { id: "user", label: "User", note: "Verified storefront access" },
+              { id: "author", label: "Author", note: "Needs verification and approval" }
             ].map((option) => (
               <button
                 className={`rounded-[28px] border p-5 text-left transition duration-200 ${
@@ -156,6 +128,18 @@ export default function LoginPage() {
           </div>
 
           <form className="mt-8 grid gap-4" onSubmit={handleSubmit}>
+            <label className="premium-input p-4">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
+                Name
+              </span>
+              <input
+                className="mt-3 w-full border-none bg-transparent p-0 text-base text-ink outline-none"
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Your name"
+                value={name}
+              />
+            </label>
+
             <label className="premium-input p-4">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-ink/45">
                 Email
@@ -183,7 +167,7 @@ export default function LoginPage() {
             </label>
 
             <button className="button-primary mt-2 w-full" disabled={loading} type="submit">
-              {loading ? "Signing in..." : `Sign in as ${role}`}
+              {loading ? "Creating account..." : `Create ${role} account`}
             </button>
           </form>
 
@@ -197,17 +181,6 @@ export default function LoginPage() {
             <div className="mt-4 rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
               {status}
             </div>
-          ) : null}
-
-          {showResend ? (
-            <button
-              className="button-secondary mt-4"
-              disabled={resending}
-              onClick={handleResendVerification}
-              type="button"
-            >
-              {resending ? "Sending..." : "Resend Verification Email"}
-            </button>
           ) : null}
         </div>
       </div>
