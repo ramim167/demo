@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: #f8f2eb;
+  --bg-soft: #eef3fb;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(255, 255, 255, 0.94);
+  --panel-dark: #172033;
+  --panel-dark-2: #1f2b43;
+  --ink: #182033;
+  --muted: #6c7486;
+  --line: rgba(24, 32, 51, 0.08);
+  --accent: #5b7cfa;
+  --accent-strong: #4364df;
+  --accent-soft: rgba(91, 124, 250, 0.14);
+  --glow: rgba(91, 124, 250, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(91, 124, 250, 0.12), transparent 24%),
+    radial-gradient(circle at top right, rgba(234, 222, 210, 0.55), transparent 28%),
+    linear-gradient(180deg, #fdf9f4 0%, #f4f6fb 42%, #f7efe7 100%);
+  color: var(--ink);
+  font-family: var(--font-body), sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.58), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.42)),
+    linear-gradient(rgba(24, 32, 51, 0.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24, 32, 51, 0.014) 1px, transparent 1px);
+  background-size: auto, 88px 88px, 88px 88px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 72%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(91, 124, 250, 0.2);
+}
+
+.font-display {
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.font-body {
+  font-family: var(--font-body), sans-serif;
+}
+
+@layer components {
+  .shell {
+    @apply mx-auto w-full max-w-[1380px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 246, 242, 0.88)),
+      radial-gradient(circle at top right, rgba(91, 124, 250, 0.08), transparent 38%);
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    box-shadow:
+      0 28px 80px rgba(12, 20, 34, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    @apply rounded-[32px] backdrop-blur-xl;
+  }
+
+  .panel-dark {
+    background:
+      linear-gradient(180deg, rgba(26, 35, 54, 0.96), rgba(17, 24, 38, 0.98)),
+      radial-gradient(circle at top right, rgba(91, 124, 250, 0.18), transparent 32%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 30px 85px rgba(9, 13, 24, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    @apply rounded-[32px] text-white;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.26em];
+    border: 1px solid rgba(91, 124, 250, 0.18);
+    background: rgba(91, 124, 250, 0.08);
+    color: var(--accent-strong);
+  }
+
+  .button-primary {
+    background: linear-gradient(135deg, #6a87ff 0%, #4967e2 100%);
+    box-shadow:
+      0 18px 40px rgba(91, 124, 250, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:brightness-110;
+  }
+
+  .button-secondary {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(6, 16, 29, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-ink transition duration-200 hover:-translate-y-0.5 hover:border-accent hover:text-accent;
+  }
+
+  .premium-input {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 244, 239, 0.92)),
+      radial-gradient(circle at top right, rgba(91, 124, 250, 0.06), transparent 36%);
+    border: 1px solid rgba(6, 16, 29, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.82),
+      0 10px 24px rgba(8, 18, 34, 0.06);
+    @apply rounded-[24px] transition focus-within:border-accent focus-within:shadow-[0_0_0_4px_rgba(91,124,250,0.12)];
+  }
+
+  .premium-divider {
+    border-color: rgba(6, 16, 29, 0.08);
+  }
+
+  .section-heading {
+    @apply font-display leading-[0.92] text-ink;
+    letter-spacing: -0.03em;
+  }
+
+  .muted-copy {
+    color: rgba(6, 16, 29, 0.62);
+  }
+}

@@ -1,0 +1,390 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum SportType {
+  FOOTBALL
+  CRICKET
+}
+
+enum TeamType {
+  CLUB
+  NATIONAL
+}
+
+enum EditionType {
+  PLAYER_VERSION
+  FAN_VERSION
+  RETRO_JERSEY
+  LIMITED_DROP
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum InventoryStatus {
+  IN_STOCK
+  LOW_STOCK
+  LIMITED_EDITION
+  PREORDER
+  OUT_OF_STOCK
+}
+
+enum FitProfile {
+  SLIM
+  REGULAR
+  RELAXED
+}
+
+enum PatchType {
+  LEAGUE
+  TOURNAMENT
+  COMMEMORATIVE
+}
+
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+}
+
+enum ShippingZone {
+  INSIDE_CITY
+  OUTSIDE_CITY
+  INTERNATIONAL
+}
+
+enum PaymentMethod {
+  BKASH
+  NAGAD
+  COD
+  CARD
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PRINTING
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ProductionStatus {
+  QUEUED
+  PRINTING
+  COMPLETED
+  HOLD
+}
+
+enum ShipmentStatus {
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+}
+
+model League {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  sport       SportType
+  description String?
+  teams       Team[]
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Team {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  teamType    TeamType
+  sport       SportType
+  countryCode String?
+  leagueId    String?
+  league      League?   @relation(fields: [leagueId], references: [id])
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id                String                   @id @default(cuid())
+  slug              String                   @unique
+  name              String
+  shortName         String?
+  description       String
+  longDescription   String?
+  status            ProductStatus            @default(ACTIVE)
+  sport             SportType
+  teamId            String?
+  team              Team?                    @relation(fields: [teamId], references: [id])
+  leagueId          String?
+  league            League?                  @relation(fields: [leagueId], references: [id])
+  heroTag           String?
+  accentToken       String?
+  priceFrom         Decimal                  @db.Decimal(10, 2)
+  ratingAverage     Float                    @default(0)
+  ratingCount       Int                      @default(0)
+  tags              String[]
+  customizationRule ProductCustomizationRule?
+  media             ProductMedia[]
+  variants          ProductVariant[]
+  patchOptions      ProductPatchOption[]
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+}
+
+model ProductCustomizationRule {
+  id                String  @id @default(cuid())
+  productId         String  @unique
+  allowCustomName   Boolean @default(true)
+  customNameMax     Int     @default(12)
+  allowCustomNumber Boolean @default(true)
+  customNumberMin   Int     @default(0)
+  customNumberMax   Int     @default(99)
+  allowPatches      Boolean @default(true)
+  sizeGuideJson     Json?
+  product           Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductMedia {
+  id         String    @id @default(cuid())
+  productId  String
+  type       MediaType
+  url        String
+  altText    String
+  sortOrder  Int       @default(0)
+  isPrimary  Boolean   @default(false)
+  posterUrl  String?
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model ProductVariant {
+  id              String            @id @default(cuid())
+  productId       String
+  sku             String            @unique
+  editionType     EditionType
+  versionLabel    String
+  fitProfile      FitProfile
+  price           Decimal           @db.Decimal(10, 2)
+  compareAtPrice  Decimal?          @db.Decimal(10, 2)
+  currencyCode    String            @default("BDT")
+  inventoryStatus InventoryStatus   @default(IN_STOCK)
+  badgeText       String?
+  isDefault       Boolean           @default(false)
+  sizeStocks      VariantSizeStock[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  product         Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model SizeOption {
+  id           String             @id @default(cuid())
+  code         String             @unique
+  label        String
+  sortOrder    Int                @default(0)
+  chestCmMin   Int?
+  chestCmMax   Int?
+  lengthCm     Int?
+  sizeStocks   VariantSizeStock[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model VariantSizeStock {
+  id               String         @id @default(cuid())
+  variantId        String
+  sizeId           String
+  quantityOnHand   Int            @default(0)
+  reservedQuantity Int            @default(0)
+  reorderLevel     Int            @default(0)
+  variant          ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  size             SizeOption     @relation(fields: [sizeId], references: [id])
+
+  @@unique([variantId, sizeId])
+}
+
+model PatchOption {
+  id              String             @id @default(cuid())
+  slug            String             @unique
+  name            String
+  patchType       PatchType
+  tournament      String?
+  description     String?
+  priceDelta      Decimal            @db.Decimal(10, 2)
+  imageUrl        String?
+  productLinks    ProductPatchOption[]
+  cartItemPatches CartItemPatch[]
+  orderItemPatches OrderItemPatch[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+model ProductPatchOption {
+  id            String      @id @default(cuid())
+  productId     String
+  patchOptionId String
+  isDefault     Boolean     @default(false)
+  sortOrder     Int         @default(0)
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  patchOption   PatchOption @relation(fields: [patchOptionId], references: [id])
+
+  @@unique([productId, patchOptionId])
+}
+
+model Cart {
+  id           String      @id @default(cuid())
+  sessionToken String      @unique
+  status       CartStatus  @default(ACTIVE)
+  currencyCode String      @default("BDT")
+  subtotal     Decimal     @default(0) @db.Decimal(10, 2)
+  itemCount    Int         @default(0)
+  items        CartItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model CartItem {
+  id            String         @id @default(cuid())
+  cartId        String
+  productId     String
+  variantId     String
+  sizeId        String
+  quantity      Int            @default(1)
+  unitPrice     Decimal        @db.Decimal(10, 2)
+  lineTotal     Decimal        @db.Decimal(10, 2)
+  customName    String?
+  customNumber  Int?
+  printingNotes String?
+  cart          Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id])
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
+  size          SizeOption     @relation(fields: [sizeId], references: [id])
+  patches       CartItemPatch[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model CartItemPatch {
+  id                String      @id @default(cuid())
+  cartItemId        String
+  patchOptionId     String
+  unitPriceSnapshot Decimal     @db.Decimal(10, 2)
+  cartItem          CartItem    @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  patchOption       PatchOption @relation(fields: [patchOptionId], references: [id])
+
+  @@unique([cartItemId, patchOptionId])
+}
+
+model Order {
+  id                String                 @id @default(cuid())
+  orderNumber       String                 @unique
+  status            OrderStatus            @default(PENDING)
+  paymentMethod     PaymentMethod
+  paymentStatus     PaymentStatus          @default(UNPAID)
+  currencyCode      String                 @default("BDT")
+  shippingZone      ShippingZone
+  subtotal          Decimal                @db.Decimal(10, 2)
+  shippingFee       Decimal                @db.Decimal(10, 2)
+  discountTotal     Decimal                @default(0) @db.Decimal(10, 2)
+  grandTotal        Decimal                @db.Decimal(10, 2)
+  recipientName     String
+  phone             String
+  email             String?
+  addressLine1      String
+  addressLine2      String?
+  city              String
+  area              String?
+  postalCode        String?
+  courierProvider   String?
+  trackingCode      String?
+  shippingLabelUrl  String?
+  items             OrderItem[]
+  shipmentEvents    ShipmentTrackingEvent[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+}
+
+model OrderItem {
+  id                    String           @id @default(cuid())
+  orderId               String
+  productId             String
+  variantId             String
+  sizeId                String
+  skuSnapshot           String
+  productNameSnapshot   String
+  editionLabelSnapshot  String
+  sizeLabelSnapshot     String
+  quantity              Int
+  unitPrice             Decimal          @db.Decimal(10, 2)
+  lineTotal             Decimal          @db.Decimal(10, 2)
+  customName            String?
+  customNumber          Int?
+  printingNotes         String?
+  productionStatus      ProductionStatus @default(QUEUED)
+  product               Product          @relation(fields: [productId], references: [id])
+  variant               ProductVariant   @relation(fields: [variantId], references: [id])
+  size                  SizeOption       @relation(fields: [sizeId], references: [id])
+  order                 Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  patches               OrderItemPatch[]
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
+model OrderItemPatch {
+  id                 String      @id @default(cuid())
+  orderItemId        String
+  patchOptionId      String
+  patchNameSnapshot  String
+  patchPriceSnapshot Decimal     @db.Decimal(10, 2)
+  orderItem          OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  patchOption        PatchOption @relation(fields: [patchOptionId], references: [id])
+
+  @@unique([orderItemId, patchOptionId])
+}
+
+model ShipmentTrackingEvent {
+  id          String         @id @default(cuid())
+  orderId     String
+  status      ShipmentStatus
+  label       String
+  note        String?
+  happenedAt  DateTime
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+}
